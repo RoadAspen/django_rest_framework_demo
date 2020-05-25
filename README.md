@@ -1,1 +1,1 @@
-# django_rest_frameword_demo
+# django_rest_framework_demo
