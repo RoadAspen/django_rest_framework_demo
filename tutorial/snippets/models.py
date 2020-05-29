@@ -13,8 +13,8 @@ class Snippet(models.Model):
     """
     外键 owner ，外联至 auth.User model， related_name 默认为当前的model类的小写， 主要用于反查 
     """
-    owner1 = models.ForeignKey('auth.User',related_name='snippets',on_delete= models.CASCADE, default='')
-    highlighted = models.TextField() 
+    owner = models.ForeignKey('auth.User',related_name='snippets',on_delete= models.CASCADE, default='')
+    highlighted = models.TextField()  # 文本类型 ，根据其他字段计算得来
 
     created = models.DateTimeField(auto_now_add=True) # 创建时间 自动生成
     title = models.CharField(max_length=100,blank=True,default='') # title 不传默认为 空字符串
@@ -23,7 +23,7 @@ class Snippet(models.Model):
     language = models.CharField(choices=LANGUAGE_CHOICES,default='python',max_length=100) # 语言类型 可选像为 list 
     style = models.CharField(choices=STYLE_CHOICES,default='friendly', max_length=100) # 样式 可选项较多
 
-    # 添加 save 方法
+    # 添加 save 方法,覆盖super 的save方法，用于定制在向model写操作时做一些逻辑计算
     def save(self, *args, **kwargs):
         """
         使用`pygments`库创建一个高亮显示的HTML表示代码段。

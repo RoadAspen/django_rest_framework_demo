@@ -1,7 +1,7 @@
 # python 环境文件夹
 /venv
 # sql lite 文件
-/tutorial/tutorial/db.sqlite3
+/tutorial/db.sqlite3
 
 # __pycache__ 不提交
 /tutorial/tutorial/__pycache__

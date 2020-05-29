@@ -7,8 +7,9 @@ from rest_framework.decorators import api_view,APIView
 from rest_framework.response import Response
 from rest_framework import status
 from snippets.models import Snippet
-from snippets.serializers import SnippetSerializer
+from snippets.serializers import SnippetSerializer,UserSerializer
 from rest_framework import mixins , generics 
+from django.contrib.auth.models import User
 # Create your views here.
 
 """
@@ -286,3 +287,23 @@ class SnippetGenericMixinDetailRetrieveAPIView(generics.RetrieveAPIView):
     """
     queryset = Snippet.objects.all()
     serializer_class = SnippetSerializer # serializer class
+
+
+
+# 添加 user 视图
+
+class UserList(generics.ListAPIView): # 获取user
+    """
+    获取user 的list, ListAPIView 提供了 get 方法 ，然后调用了 ListModelMixin 的 list 方法
+    """
+    queryset = User.objects.all()
+    serializer_class = UserSerializer
+
+
+
+class UserDetail(generics.RetrieveAPIView): #  update新的
+    """
+    getuser， RetrieveAPIView 提供了 get 方法 ，然后调用了 RetrieveModelMixin 的 retrieve 方法.并获取了uri传参
+    """
+    queryset = User.objects.all()
+    serializer_class = UserSerializer

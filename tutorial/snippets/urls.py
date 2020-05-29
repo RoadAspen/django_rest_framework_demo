@@ -10,5 +10,7 @@ urlpatterns = [
     path('snippetsclass/<int:pk>/', views.SnippetDetailView.as_view()), # 走 类 view
     path('snippetsmixinclass/', views.SnippetGenericMixinListAPIView.as_view()), # 走 类 view
     path('snippetsmixinclass/<int:pk>/', views.SnippetGenericMixinDetailRetrieveAPIView.as_view()), # 走 类 view
+    path('users/',views.UserList.as_view()),
+    path('users/<int:pk>/',views.UserDetail.as_view()),
 ]
 

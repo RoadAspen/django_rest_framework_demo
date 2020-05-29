@@ -35,9 +35,11 @@ from .models import Snippet, STYLE_CHOICES, LANGUAGE_CHOICES
 
 """
 使用 ModelSerializers , 可以通过 Meta 中的  model 和fields 快速的创建对应Model 的序列化器
-并 默认简单实现的 create  和 update 
+并 默认简单实现的 create  和 update 。  get 方法是不需要特殊的字段验证
 """
 class SnippetSerializer(serializers.ModelSerializer):
+
+
     class Meta:
         model = Snippet
         fields=('id', 'title', 'code', 'linenos', 'language', 'style')
