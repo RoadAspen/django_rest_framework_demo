@@ -2,16 +2,18 @@ from django.db import models
 from pygments.lexers import get_all_lexers, get_lexer_by_name
 from pygments.styles import get_all_styles
 from pygments.formatters.html import HtmlFormatter
+from pygments import highlight
 # Create your models here.
 
 LEXERS = [item for item in get_all_lexers() if item[1]]
 LANGUAGE_CHOICES = sorted([(item[1][0],item[0]) for item in LEXERS])
 STYLE_CHOICES = sorted((item, item) for item in get_all_styles())
 
+
 # model 类
 class Snippet(models.Model):
     """
-    外键 owner ，外联至 auth.User model， related_name 默认为当前的model类的小写， 主要用于反查 
+    外键 owner ，外联至 auth.User model， related_name 默认为当前的model类的小写，主要用于反查 ,可以不写，默认为 Model类名的 小写+ 下划线 set
     """
     owner = models.ForeignKey('auth.User',related_name='snippets',on_delete= models.CASCADE, default='')
     highlighted = models.TextField()  # 文本类型 ，根据其他字段计算得来

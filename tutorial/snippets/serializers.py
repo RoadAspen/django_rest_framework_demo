@@ -34,26 +34,61 @@ from .models import Snippet, STYLE_CHOICES, LANGUAGE_CHOICES
 
 
 """
-使用 ModelSerializers , 可以通过 Meta 中的  model 和fields 快速的创建对应Model 的序列化器
+使用 ModelSerializers , 可以通过 Meta 中的  model 和fields 快速的创建对应Model 的序列化器。field 字段在这里已经不需要了， 
 并 默认简单实现的 create  和 update 。  get 方法是不需要特殊的字段验证
 """
-class SnippetSerializer(serializers.ModelSerializer):
+# class SnippetSerializer(serializers.ModelSerializer):
+#
+#     """
+#     source 控制用哪个属性填充字段，并且可以指向序列化十里山搞得任何属性,这里定义的属性必须在 fields中添加.
+#     readonlyfield 只读，只能序列化表示，不能反序列化更新模型实例， 也可以使用 CharField（readonly = True）
+#     """
+#     owner = serializers.ReadOnlyField(source = 'owner.username')
+#
+#     class Meta:
+#         model = Snippet
+#         fields=('id', 'title', 'code', 'linenos', 'language', 'style', 'owner')
+#
+#
+#
+#
+#
+# class UserSerializer(serializers.ModelSerializer):
+#     """
+#     model 中不存在snippets 字段，这里通过反向关联查出，所以需要添加
+#     """
+#     snippets = serializers.PrimaryKeyRelatedField(many=True,queryset=Snippet.objects.all())
+#
+#     class Meta:
+#         model = User
+#         # fields 不一定填写 model中的字段，也可以填写不在model的字段，这些字段以及 serializer定义 在 执行 get 和 retrieve 操作时执行
+#         fields = ('id', 'username', 'snippets')
 
 
+"""
+在实体之间使用超链接的方式 ，HyperlinkedModelSerializer 与 ModelSerializer 的 区别是 
+HyperlinkedModelSerializer 默认不包含 'id' 字段。 它包含一个url字段，使用 HyperlinkedIdentityField
+关联关系使用HyperlinkedRelatedField，而不是PrimaryKeyRelatedField
+根据 url 的不同
+"""
+
+
+class SnippetSerializer(serializers.HyperlinkedModelSerializer):
+    owner = serializers.ReadOnlyField(source='owner.username')
+    # 在 view_name 指向 url 为 snippet-highlight
+    highlight = serializers.HyperlinkedIdentityField(view_name='snippet-highlight', format='html')
+
+    # url 指向 model_name-detail
     class Meta:
         model = Snippet
-        fields=('id', 'title', 'code', 'linenos', 'language', 'style')
+        fields = ['url', 'id', 'highlight', 'owner',
+                  'title', 'code', 'linenos', 'language', 'style']
 
 
+class UserSerializer(serializers.HyperlinkedModelSerializer):
+    # 在 view_name 指向 url 指向 snippet-detail， 可以点击
+    snippets = serializers.HyperlinkedRelatedField(many=True, view_name='snippet-detail', read_only=True)
 
-
-
-class UserSerializer(serializers.ModelSerializer):
-    """
-    model 中不存在snippets 字段，这里通过反向关联查出，所以需要添加
-    """
-    snippets = serializers.PrimaryKeyRelatedField(many=True,queryset=Snippet.objects.all())
-    
     class Meta:
         model = User
-        fields = ('id', 'username', 'snippets')
+        fields = ['url', 'id', 'username', 'snippets']

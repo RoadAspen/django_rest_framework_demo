@@ -3,6 +3,8 @@
 # sql lite 文件
 /tutorial/db.sqlite3
 
+# 数据库同步文件
+/tutorial/snippets/migrations
 # __pycache__ 不提交
 /tutorial/tutorial/__pycache__
 /tutorial/snippets/__pycache__

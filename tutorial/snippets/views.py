@@ -1,15 +1,20 @@
-from django.shortcuts import render
-from django.http import HttpResponse ,Http404
-from django.views.decorators.csrf import csrf_exempt
-from rest_framework.renderers import JSONRenderer
-from rest_framework.parsers import JSONParser
-from rest_framework.decorators import api_view,APIView
-from rest_framework.response import Response
-from rest_framework import status
-from snippets.models import Snippet
-from snippets.serializers import SnippetSerializer,UserSerializer
-from rest_framework import mixins , generics 
+from django.shortcuts import render  # django 提供的渲染
+from django.http import HttpResponse, Http404  # HttpResponse 只 返回 状态码 ， Http404 更直观
+from django.views.decorators.csrf import csrf_exempt  # 禁用 csrf_exempt 装饰器
+from rest_framework.renderers import JSONRenderer  # json 转换
+from rest_framework.parsers import JSONParser  # json 解析
+from rest_framework.decorators import api_view, APIView  # rest_framework 提供的 装饰器 和 基类
+from rest_framework.response import Response  # rest_framework 提供的 Response ,可以根据请求传递的 accept 和 content-type 来返回响应格式的数据
+from rest_framework import status  # 对 http 状态码 的封装，更加直观和语义化
+from .models import Snippet
+from .serializers import SnippetSerializer, UserSerializer
+from rest_framework import mixins, generics  # rest_framework 提供的mixins方法和基类，以及 mixin和GenericApiView 结合的其他 APiview
 from django.contrib.auth.models import User
+from rest_framework import permissions  # rest_framework 提供的 权限认证
+from .permissions import IsOwnerOrReadOnly
+from rest_framework import reverse, renderers
+from rest_framework import viewsets
+from rest_framework.decorators import action
 # Create your views here.
 
 """
@@ -57,7 +62,7 @@ from django.contrib.auth.models import User
 #         snippet = Snippet.objects.get(pk=pk) # 先根据 pk 获取到一个 确定的数据
 #     except Snippet.DoesNotExist:
 #         return HttpResponse(status=404)
-    
+
 #     if request.method == 'GET':
 #         serializer = SnippetSerializer(snippet)
 #         return JSONResponse(serializer.data)
@@ -65,7 +70,7 @@ from django.contrib.auth.models import User
 #     elif request.method == 'PUT':
 #         data = JSONParser().parse(request)
 #         serializer = SnippetSerializer(snippet, data=data)
-        
+
 #         if serializer.is_valid():
 #             serializer.save()
 #             return JSONResponse(serializer.data)
@@ -82,170 +87,173 @@ from django.contrib.auth.models import User
     用于 类的  APIView 类
 """
 
-# 基于函数的视图  format = None 即 不解析后边的format
-@csrf_exempt
-@api_view(['GET','POST'])
-def snippet_list(request,format = None):
-    """
-    列出所有的snippets，或者创建一个新的snippet
-    """
-    if request.method == 'GET':
-        snippet = Snippet.objects.all()
-        serializer = SnippetSerializer(snippet,many = True)
-        return Response(serializer.data)
+# # 基于函数的视图  format = None 即 不解析后边的format
+# @csrf_exempt
+# @api_view(['GET','POST'])
+# def snippet_list(request,format = None):
+#     """
+#     列出所有的snippets，或者创建一个新的snippet
+#     """
+#     if request.method == 'GET':
+#         snippet = Snippet.objects.all()
+#         serializer = SnippetSerializer(snippet,many = True)
+#         return Response(serializer.data)
 
-    elif request.method == 'POST':
-        serializer = SnippetSerializer(data = request.data)
+#     elif request.method == 'POST':
+#         serializer = SnippetSerializer(data = request.data)
 
-        if serializer.is_valid(): # 如果传过来的参数时序列化之后是合法的，则执行save，返回 201 created
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        
-        return Response(serializer.errors,status = status.HTTP_400_BAD_REQUEST)
+#         if serializer.is_valid(): # 如果传过来的参数时序列化之后是合法的，则执行save，返回 201 created
+#             serializer.save()
+#             return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+#         return Response(serializer.errors,status = status.HTTP_400_BAD_REQUEST)
 
 
-@csrf_exempt
-@api_view(['GET','PUT','DELETE'])
-def snippet_detail(request, pk, format = None):
-    """
-    获取、更新、删除一个pk索引的snippets,先获取资源，如果获取失败直接返回 Not Found
-    """
-    try:
-        snippet = Snippet.objects.get(pk=pk)
-    except expression as identifier:
-        return Response(status = status.HTTP_404_NOT_FOUND)
-    
-    if request.method == 'GET': # get请求  序列化之后直接返回
-        serializer = SnippetSerializer(snippet)
-        return Response(serializer.data, status = status.HTTP_200_OK)
-    
-    elif request.method == 'PUT':
+# @csrf_exempt
+# @api_view(['GET','PUT','DELETE'])
+# def snippet_detail(request, pk, format = None):
+#     """
+#     获取、更新、删除一个pk索引的snippets,先获取资源，如果获取失败直接返回 Not Found
+#     """
+#     try:
+#         snippet = Snippet.objects.get(pk=pk)
+#     except expression as identifier:
+#         return Response(status = status.HTTP_404_NOT_FOUND)
 
-        serializer = SnippetSerializer(snippet,data = request.data)
+#     if request.method == 'GET': # get请求  序列化之后直接返回
+#         serializer = SnippetSerializer(snippet)
+#         return Response(serializer.data, status = status.HTTP_200_OK)
 
-        if serializer.is_valid(): # 如果 传过来的值都是合法的
-            serializer.save()
-            return Response(serializer.data, status = status.HTTP_200_OK)
-        
-        return Response(serializer.errors, status = status.HTTP_400_BAD_REQUEST)
-    elif request.method == 'DELETE': # 如果是删除
-        snippet.delete()
-        return Response(status=status.HTTP_204_NO_CONTENT)
+#     elif request.method == 'PUT':
+
+#         serializer = SnippetSerializer(snippet,data = request.data)
+
+#         if serializer.is_valid(): # 如果 传过来的值都是合法的
+#             serializer.save()
+#             return Response(serializer.data, status = status.HTTP_200_OK)
+
+#         return Response(serializer.errors, status = status.HTTP_400_BAD_REQUEST)
+#     elif request.method == 'DELETE': # 如果是删除
+#         snippet.delete()
+#         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 # 基于类的视图 , 继承自 APIView
 
-# list  有 get 和 post 方法
-class SnippetListView(APIView):
-    """
-    列出所有的snippets，或者创建一个新的snippet，使用 class view 必须在 url中调用 as_view() 方法
-    """
-    def get(self,request,format=None): # 基于类，所以 第一个参数为 self
+# # list  有 get 和 post 方法
+# class SnippetListView(APIView):
+#     """
+#     列出所有的snippets，或者创建一个新的snippet，使用 class view 必须在 url中调用 as_view() 方法， 不用再使用 if else
+#     """
+#     def get(self,request,format=None): # 基于类，所以 第一个参数为 self
 
-        snippet = Snippet.objects.all()
-        serializer = SnippetSerializer(snippet,many = True)
+#         snippet = Snippet.objects.all()
+#         serializer = SnippetSerializer(snippet,many = True)
 
-        return Response(serializer.data)
-    
-    def post(self,request,format=None):
-        serializer = SnippetSerializer(data=request.data)
+#         return Response(serializer.data)
 
-        if serializer.is_valid():
-            serializer.save()
+#     def post(self,request,format=None):
+#         serializer = SnippetSerializer(data=request.data)
 
-            return Response(serializer.data, status = status.HTTP_201_CREATED)
-        
-        return Response(serializer.errors, status = status.HTTP_400_BAD_REQUEST)
-     
-# detail 有 get put delete 方法
-class SnippetDetailView(APIView):
-    """
-    获取、更新、删除一个pk索引的snippets,先获取资源，如果获取失败直接返回 Not Found，使用 class view 必须在 url中调用 as_view() 方法
-    """
-    # 由于 detail 是基于一条已有的数据 做一些 改变，所以需要先定义获取数据的 func
-    def get_object(self,pk):  # 该方法可用 generics.get_object_or_404 来 代替
-        try:
-            return Snippet.objects.get(pk = pk)
-        except expression as identifier:
-            raise Http404
-            
+#         if serializer.is_valid():
+#             serializer.save()
 
-    def get(self, request ,pk ,format=None):
-        snippet = self.get_object(pk)
-        serializer = SnippetSerializer(snippet)
-        return Response(serializer.data, status=status.HTTP_200_OK)
-    
-    def put(self, request,pk,format=None):
-        snippet = self.get_object(pk)
-        serializer = SnippetSerializer(snippet, data = request.data)
+#             return Response(serializer.data, status = status.HTTP_201_CREATED)
 
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status = status.HTTP_201_CREATED)
-        return Response(serializer.errors, status = status.HTTP_400_BAD_REQUEST)
+#         return Response(serializer.errors, status = status.HTTP_400_BAD_REQUEST)
 
-    def delete(self, request,pk,format=None):
-        snippet = self.get_object(pk)
-        snippet.delete()
-        return Response(status=status.HTTP_204_NO_CONTENT)
 
-   
+#     def perform_create(self,serializer): # 修改实例的保存方法，并处理传入请求或者url中其他方法
+#         serializer.save(owner = self.request.user)
+
+# # detail 有 get put delete 方法
+# class SnippetDetailView(APIView):
+#     """
+#     获取、更新、删除一个pk索引的snippets,先获取资源，如果获取失败直接返回 Not Found，使用 class view 必须在 url中调用 as_view() 方法
+#     """
+#     # 由于 detail 是基于一条已有的数据 做一些 改变，所以需要先定义获取数据的 func
+#     def get_object(self,pk):  # 该方法可用 generics.get_object_or_404 来 代替
+#         try:
+#             return Snippet.objects.get(pk = pk)
+#         except expression as identifier:
+#             raise Http404
+
+
+#     def get(self, request ,pk ,format=None):
+#         snippet = self.get_object(pk)
+#         serializer = SnippetSerializer(snippet)
+#         return Response(serializer.data, status=status.HTTP_200_OK)
+
+#     def put(self, request,pk,format=None):
+#         snippet = self.get_object(pk)
+#         serializer = SnippetSerializer(snippet, data = request.data)
+
+#         if serializer.is_valid():
+#             serializer.save()
+#             return Response(serializer.data, status = status.HTTP_201_CREATED)
+#         return Response(serializer.errors, status = status.HTTP_400_BAD_REQUEST)
+
+#     def delete(self, request,pk,format=None):
+#         snippet = self.get_object(pk)
+#         snippet.delete()
+#         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
 """
 基于类视图的最大优势之一是它可以轻松地创建可复用的行为。基于模型的api视图都是可以复用的， rest framework 在 mixins 实现  
 """
-# 基于 mixins 的 类视图  list 支持  get post 
-class SnippetMixinListView(mixins.ListModelMixin,
-                            mixins.CreateModelMixin,
-                            generics.GenericAPIView):
-    """
-    list 视图 ，具有  list 和 create api ，分别对应 get 和 post 方法。 类 View 则 继承自 GenericAPIView
-    GenericAPIView 内置了 get_object, get_queryset, 且 必须设置 self.queryset,除非 覆写 get_object 和 get_queryset
-    ListModelMixin 提供了 list 方法， 代替 SnippetSerializer(snippet,many=True)
-    CreateModelMixin 提供了 create 方法， 代替 SnippetSerializer(data = request.data) 和 is_valid 以及save 操作.
-    mixins 类 必须 依赖于 GenericAPIView 类提供的方法
-    """
-    queryset = Snippet.objects.all()
-    serializer_class = SnippetSerializer # serializer class
+# # 基于 mixins 的 类视图  list 支持  get post 
+# class SnippetMixinListView(mixins.ListModelMixin,
+#                             mixins.CreateModelMixin,
+#                             generics.GenericAPIView):
+#     """
+#     list 视图 ，具有  list 和 create api ，分别对应 get 和 post 方法。 类 View 则 继承自 GenericAPIView
+#     GenericAPIView 内置了 get_object, get_queryset, 且 必须设置 self.queryset,除非 覆写 get_object 和 get_queryset
+#     ListModelMixin 提供了 list 方法， 代替 SnippetSerializer(snippet,many=True)
+#     CreateModelMixin 提供了 create 方法， 代替 SnippetSerializer(data = request.data) 和 is_valid 以及save 操作.
+#     mixins 类 必须 依赖于 GenericAPIView 类提供的方法
+#     """
+#     queryset = Snippet.objects.all()
+#     serializer_class = SnippetSerializer # serializer class
 
-    def get(self,request,*args,**kwargs):
-        # 直接调用 ListModelMixin 内置的list 方法
-        return self.list(request,*args,**kwargs)
-    
-    def post(self,request,*args,**kwargs):
-        # 直接调用 CreateModelMixin 内置的create 方法
-        return self.create(request,*args,**kwargs)
+#     def get(self,request,*args,**kwargs):
+#         # 直接调用 ListModelMixin 内置的list 方法
+#         return self.list(request,*args,**kwargs)
+
+#     def post(self,request,*args,**kwargs):
+#         # 直接调用 CreateModelMixin 内置的create 方法
+#         return self.create(request,*args,**kwargs)
 
 
 # 基于 mixins 的 类视图  defail 支持  get put delete 
-class SnippetMixinDetailView(mixins.RetrieveModelMixin,
-                            mixins.UpdateModelMixin,
-                            mixins.DestroyModelMixin,
-                            generics.GenericAPIView):
-    """
-    detail 视图 ，具有  retrieve 和 update destroy api ，分别对应 get 和 put、delete 方法。 类 View 则 继承自 GenericAPIView 。
-    GenericAPIView 内置了 get_object, get_queryset, 且 必须设置 self.queryset,除非 覆写 get_object 和 get_queryset
-    RetrieveModelMixin 提供了 retrieve 方法， 代替 SnippetSerializer(snippet)
-    UpdateModelMixin 提供了 update 方法， 代替 SnippetSerializer(snippet，data = request.data) 和 is_valid 以及save 操作.
-    DestroyModelMixin 提供了 destroy 方法， 代替  snippet.delete() 操作.
-    mixins 类 必须 依赖于 GenericAPIView 类提供的方法
-    为什么 mixins 类提供的方法不是 get ，post ，delete 而是 retrieve、create、update 的原因。->
-    主要是 在我们的类中需要自定义 get、post、update 等方法，如果 mixins提供的方法名是http方法，则会被我们写的方法 覆盖。
-    """
-    queryset = Snippet.objects.all()
-    serializer_class = SnippetSerializer # serializer class
+# class SnippetMixinDetailView(mixins.RetrieveModelMixin,
+#                             mixins.UpdateModelMixin,
+#                             mixins.DestroyModelMixin,
+#                             generics.GenericAPIView):
+#     """
+#     detail 视图 ，具有  retrieve 和 update destroy api ，分别对应 get 和 put、delete 方法。 类 View 则 继承自 GenericAPIView 。
+#     GenericAPIView 内置了 get_object, get_queryset, 且 必须设置 self.queryset,除非 覆写 get_object 和 get_queryset
+#     RetrieveModelMixin 提供了 retrieve 方法， 代替 SnippetSerializer(snippet)
+#     UpdateModelMixin 提供了 update 方法， 代替 SnippetSerializer(snippet，data = request.data) 和 is_valid 以及save 操作.
+#     DestroyModelMixin 提供了 destroy 方法， 代替  snippet.delete() 操作.
+#     mixins 类 必须 依赖于 GenericAPIView 类提供的方法
+#     为什么 mixins 类提供的方法不是 get ，post ，delete 而是 retrieve、create、update 的原因。->
+#     主要是 在我们的类中需要自定义 get、post、update 等方法，如果 mixins提供的方法名是http方法，则会被我们写的方法 覆盖。
+#     """
+#     queryset = Snippet.objects.all()
+#     serializer_class = SnippetSerializer # serializer class
 
-    def get(self,request,*args,**kwargs):
-        # 直接调用 RetrieveModelMixin 内置的 retrieve 方法
-        return self.retrieve(request,*args,**kwargs)
-    
-    def put(self,request,*args,**kwargs):
-        # 直接调用 UpdateModelMixin 内置的 update 方法
-        return self.update(request,*args,**kwargs)
+#     def get(self,request,*args,**kwargs):
+#         # 直接调用 RetrieveModelMixin 内置的 retrieve 方法
+#         return self.retrieve(request,*args,**kwargs)
 
-    def delete(self,request,*args,**kwargs):
-        # 直接调用 DestroyModelMixin 内置的 destory 方法
-        return self.destroy(request,*args,**kwargs)
+#     def put(self,request,*args,**kwargs):
+#         # 直接调用 UpdateModelMixin 内置的 update 方法
+#         return self.update(request,*args,**kwargs)
 
+#     def delete(self,request,*args,**kwargs):
+#         # 直接调用 DestroyModelMixin 内置的 destory 方法
+#         return self.destroy(request,*args,**kwargs)
 
 
 """
@@ -260,50 +268,126 @@ DestroyAPIView 等同于 DestroyModelMixin 和 GenericAPIView 的组合，且 �
 其他等同
 """
 
-class SnippetGenericMixinListAPIView(generics.ListAPIView):
+
+# class SnippetGenericMixinListAPIView(generics.ListAPIView):
+#     """
+#     ListAPIView 等同于 ListModelMixin 和 GenericAPIView 的组合，且 内置实现了 get 方法。
+#     """
+#     queryset = Snippet.objects.all()
+#     serializer_class = SnippetSerializer # serializer class
+
+# class SnippetGenericMixinCreateAPIView(generics.CreateAPIView):
+#     """
+#     CreateAPIView 等同于 CreateModelMixin 和 GenericAPIView 的组合，且 内置实现了 post 方法。
+#     """
+#     queryset = Snippet.objects.all()
+#     serializer_class = SnippetSerializer # serializer class
+
+# class SnippetGenericMixinListCreateAPIView(generics.ListCreateAPIView):
+#     """
+#     ListCreateAPIView 等同于 ListModelMixin,CreateModelMixin 和 GenericAPIView 的组合，且 内置实现了get, post 方法。
+#     """
+#     queryset = Snippet.objects.all()
+#     serializer_class = SnippetSerializer # serializer class
+
+# class SnippetGenericMixinDetailRetrieveAPIView(generics.RetrieveAPIView):
+#     """
+#     RetrieveAPIView 等同于 RetrieveModelMixin 和 GenericAPIView 的组合，且 内置实现了 get 方法。并在get内部执行 retrieve 方法
+#     """
+#     queryset = Snippet.objects.all()
+#     serializer_class = SnippetSerializer # serializer class
+
+
+# class SnippetListView(generics.ListCreateAPIView):
+#     """
+#     获取列表 和 新增新的数据， list 和 create  ，get 和 post
+#     """
+#     queryset = Snippet.objects.all()
+#     serializer_class = SnippetSerializer
+#     permission_classes = (permissions.IsAuthenticatedOrReadOnly,)  # 登录验证有权限后可读写 ，否则 只读
+#
+#     def perform_create(self, serializer):
+#         serializer.save(owner=self.request.user)
+#
+#
+# class SnippetDetailView(generics.RetrieveUpdateDestroyAPIView):
+#     """
+#     获取 和 更新、删除已有数据， retrieve，update，destory   get put delete
+#     """
+#     permission_classes = (
+#         permissions.IsAuthenticatedOrReadOnly, IsOwnerOrReadOnly)  # 登录验证有权限后可读写 ，登录后且owner为user时才可写,否则 只读
+#     queryset = Snippet.objects.all()
+#     serializer_class = SnippetSerializer
+
+
+class SnippetViewSet(viewsets.ModelViewSet):
     """
-    ListAPIView 等同于 ListModelMixin 和 GenericAPIView 的组合，且 内置实现了 get 方法。
+    此视图自动提供`list`，`create`，`retrieve`，`update`和`destroy`操作。
+
+    另外我们还提供了一个额外的`highlight`操作。
     """
+    permission_classes = (
+        permissions.IsAuthenticatedOrReadOnly, IsOwnerOrReadOnly)  # 登录验证有权限后可读写 ，登录后且owner为user时才可写,否则 只读
     queryset = Snippet.objects.all()
-    serializer_class = SnippetSerializer # serializer class
+    serializer_class = SnippetSerializer
 
-class SnippetGenericMixinCreateAPIView(generics.CreateAPIView):
-    """
-    CreateAPIView 等同于 CreateModelMixin 和 GenericAPIView 的组合，且 内置实现了 post 方法。
-    """
-    queryset = Snippet.objects.all()
-    serializer_class = SnippetSerializer # serializer class
+    @action(detail=True, renderer_classes=[renderers.StaticHTMLRenderer])
+    def highlight(self, request, *args, **kwargs):
+        snippet = self.get_object()
+        return Response(snippet.highlighted)
 
-class SnippetGenericMixinListCreateAPIView(generics.ListCreateAPIView):
-    """
-    ListCreateAPIView 等同于 ListModelMixin,CreateModelMixin 和 GenericAPIView 的组合，且 内置实现了get, post 方法。
-    """
-    queryset = Snippet.objects.all()
-    serializer_class = SnippetSerializer # serializer class
-
-class SnippetGenericMixinDetailRetrieveAPIView(generics.RetrieveAPIView):
-    """
-    RetrieveAPIView 等同于 RetrieveModelMixin 和 GenericAPIView 的组合，且 内置实现了 get 方法。并在get内部执行 retrieve 方法
-    """
-    queryset = Snippet.objects.all()
-    serializer_class = SnippetSerializer # serializer class
+    def perform_create(self, serializer):
+        serializer.save(owner=self.request.user)
 
 
+# # 添加 user 视图
+#
+# class UserList(generics.ListAPIView):  # 获取user
+#     """
+#     获取user 的list, ListAPIView 提供了 get 方法 ，然后调用了 ListModelMixin 的 list 方法
+#     """
+#     queryset = User.objects.all()
+#     serializer_class = UserSerializer
+#
+#
+# class UserDetail(generics.RetrieveAPIView):  # update新的
+#     """
+#     getuser， RetrieveAPIView 提供了 get 方法 ，然后调用了 RetrieveModelMixin 的 retrieve 方法.并获取了uri传参
+#     """
+#     queryset = User.objects.all()
+#     serializer_class = UserSerializer
 
-# 添加 user 视图
 
-class UserList(generics.ListAPIView): # 获取user
+"""
+使用viewset来代替list和detail两个类 
+"""
+
+
+class UserViewSet(viewsets.ReadOnlyModelViewSet):
     """
-    获取user 的list, ListAPIView 提供了 get 方法 ，然后调用了 ListModelMixin 的 list 方法
+    此视图自动提供 list 和 detail 操作,不需要再写两个类而写两次 queryset 和 serializer_class
     """
     queryset = User.objects.all()
     serializer_class = UserSerializer
 
 
+@api_view(['GET'])
+def api_root(request, format=None):
+    """
+    使用REST框架的reverse功能来返回完全限定的URL；
+    URL模式是通过方便的名称来标识
+    """
 
-class UserDetail(generics.RetrieveAPIView): #  update新的
-    """
-    getuser， RetrieveAPIView 提供了 get 方法 ，然后调用了 RetrieveModelMixin 的 retrieve 方法.并获取了uri传参
-    """
-    queryset = User.objects.all()
-    serializer_class = UserSerializer
+    return Response({
+        'users': reverse('user-list', request=request, format=format),
+        'snippets': reverse('snippet-list', request=request, format=format),
+    })
+
+#
+# class SnippetHighlight(generics.GenericAPIView):
+#     queryset = Snippet.objects.all()
+#     renderer_classes = (renderers.StaticHTMLRenderer,)
+#
+#     def get(self, request, *args, **kwargs):
+#         snippet = self.get_object()
+#         return Response(snippet.highlighted)
